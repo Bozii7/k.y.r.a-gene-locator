@@ -1,0 +1,1089 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>K.Y.R.A. — Gene Locator</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap');
+
+  :root {
+    --ink: #33111f;
+    --ink-soft: #451729;
+    --paper: #fdf3f6;
+    --paper-dim: #f6dbe4;
+    --band-dark: #5c2338;
+    --band-mid: #c98ba0;
+    --amber: #ec6f92;
+    --teal: #85976e;
+    --err: #c24a5e;
+    --impact-high: #c24a5e;
+    --impact-moderate: #d68a4c;
+    --impact-low: #c9a23a;
+    --impact-modifier: #b98ba0;
+    --mono: 'IBM Plex Mono', ui-monospace, monospace;
+    --serif: 'Source Serif 4', Georgia, serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--ink);
+    color: var(--paper);
+    font-family: var(--mono);
+    margin: 0;
+    padding: 48px 24px 80px;
+    min-height: 100vh;
+  }
+
+  .wrap {
+    max-width: 640px;
+    margin: 0 auto;
+  }
+
+  .brand {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    color: var(--amber);
+    margin-bottom: 2px;
+  }
+  .tagline {
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    color: var(--band-mid);
+    margin-bottom: 4px;
+  }
+
+  h1 {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: 28px;
+    margin: 0 0 32px;
+    color: var(--paper);
+  }
+
+  .lookup-modes {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 16px;
+  }
+
+  .mode-btn {
+    background: transparent;
+    border: 1px solid var(--band-dark);
+    color: var(--band-mid);
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 7px 14px;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .mode-btn:first-child { border-radius: 3px 0 0 3px; }
+  .mode-btn:last-child { border-radius: 0 3px 3px 0; margin-left: -1px; }
+  .mode-btn.active {
+    color: var(--ink);
+    background: var(--paper);
+    border-color: var(--paper);
+  }
+
+  .form-row {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+    margin-bottom: 28px;
+  }
+
+  select, input[type="text"] {
+    font-family: var(--mono);
+    font-size: 15px;
+    background: var(--ink-soft);
+    border: 1px solid var(--band-dark);
+    color: var(--paper);
+    padding: 12px 14px;
+    border-radius: 3px;
+    outline: none;
+  }
+  select:focus, input[type="text"]:focus {
+    border-color: var(--amber);
+  }
+
+  select { flex: 0 0 84px; cursor: pointer; }
+  input[type="text"] { flex: 1; min-width: 0; }
+  input[type="text"]::placeholder { color: var(--band-mid); }
+
+  button.go {
+    font-family: var(--mono);
+    font-weight: 500;
+    font-size: 14px;
+    background: var(--amber);
+    color: var(--ink);
+    border: none;
+    padding: 0 20px;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  button.go:hover { opacity: 0.85; }
+  button.go:disabled { opacity: 0.4; cursor: default; }
+
+  .hint {
+    font-size: 12px;
+    color: var(--band-mid);
+    margin: -20px 0 28px;
+  }
+
+  /* Ideogram */
+  .ideogram-box {
+    margin-bottom: 32px;
+    display: none;
+  }
+  .ideogram-label {
+    font-size: 11px;
+    color: var(--band-mid);
+    margin-bottom: 8px;
+  }
+  .ideogram-track {
+    position: relative;
+    height: 18px;
+    background: var(--band-dark);
+    border-radius: 9px;
+    overflow: visible;
+  }
+  .ideogram-fill {
+    position: absolute;
+    top: 0; bottom: 0; left: 0;
+    background: linear-gradient(90deg, var(--band-mid), var(--band-dark));
+    border-radius: 9px 0 0 9px;
+    opacity: 0.5;
+  }
+  .ideogram-marker {
+    position: absolute;
+    top: -6px;
+    width: 3px;
+    height: 30px;
+    background: var(--amber);
+    box-shadow: 0 0 8px rgba(236,111,146,0.6);
+    transform: translateX(-1.5px);
+  }
+  .ideogram-marker::after {
+    content: '';
+    position: absolute;
+    top: -5px;
+    left: -3px;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--amber);
+  }
+
+  /* States */
+  .status {
+    font-size: 13px;
+    color: var(--band-mid);
+    padding: 8px 0;
+  }
+  .status.error { color: var(--err); }
+
+  /* Result card */
+  .card {
+    background: var(--paper);
+    color: var(--ink);
+    border-radius: 6px;
+    padding: 28px 28px 24px;
+    display: none;
+  }
+
+  .gene-symbol {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: 30px;
+    margin: 0 0 2px;
+  }
+  .gene-fullname {
+    font-family: var(--serif);
+    font-size: 15px;
+    color: #86546a;
+    margin: 0 0 14px;
+    font-style: italic;
+  }
+  .coords {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--teal);
+    margin-bottom: 18px;
+  }
+  .description {
+    font-family: var(--serif);
+    font-size: 16px;
+    line-height: 1.55;
+    margin: 0 0 20px;
+    max-width: 62ch;
+  }
+
+  .meta-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 12px 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--paper-dim);
+    margin-bottom: 18px;
+  }
+  .meta-item .k {
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #ad7f8f;
+    margin-bottom: 3px;
+  }
+  .meta-item .v {
+    font-family: var(--mono);
+    font-size: 13.5px;
+    color: var(--ink);
+  }
+
+  .links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .links a {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--ink);
+    background: var(--paper-dim);
+    padding: 7px 12px;
+    border-radius: 4px;
+    text-decoration: none;
+    transition: background 0.15s;
+  }
+  .links a:hover { background: #efc6d5; }
+
+  .other-genes {
+    margin-top: 8px;
+    font-size: 12.5px;
+    color: var(--band-mid);
+  }
+  .other-genes button {
+    background: none;
+    border: none;
+    color: var(--teal);
+    font-family: var(--mono);
+    font-size: 12.5px;
+    cursor: pointer;
+    text-decoration: underline;
+    padding: 0;
+  }
+
+  /* Petals */
+  .petals {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+    z-index: 0;
+  }
+  .petal {
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    background: linear-gradient(135deg, #f6a9c1, var(--amber));
+    border-radius: 0 60% 0 60%;
+    opacity: 0.35;
+  }
+  .petal:nth-child(1) { top: 6%;  left: 8%;  width: 22px; height: 22px; transform: rotate(20deg); }
+  .petal:nth-child(2) { top: 14%; left: 82%; width: 14px; height: 14px; transform: rotate(-35deg); opacity: 0.28; }
+  .petal:nth-child(3) { top: 34%; left: 92%; width: 18px; height: 18px; transform: rotate(60deg); opacity: 0.22; }
+  .petal:nth-child(4) { top: 2%;  left: 46%; width: 12px; height: 12px; transform: rotate(-10deg); opacity: 0.3; }
+  .petal:nth-child(5) { top: 46%; left: 4%;  width: 13px; height: 13px; transform: rotate(80deg); opacity: 0.2; }
+  .wrap { position: relative; z-index: 1; }
+
+  /* New info sections */
+  .section-label {
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #ad7f8f;
+    margin: 20px 0 8px;
+  }
+  .tag-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .tag {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--ink);
+    background: var(--paper-dim);
+    padding: 5px 10px;
+    border-radius: 100px;
+  }
+  .tag.clickable {
+    cursor: pointer;
+    border: none;
+    background: #efc6d5;
+    transition: background 0.15s;
+  }
+  .tag.clickable:hover { background: #e6a9c0; }
+  .plain-list {
+    margin: 0;
+    padding-left: 18px;
+    font-family: var(--serif);
+    font-size: 14.5px;
+    line-height: 1.6;
+  }
+  .plain-list li { margin-bottom: 3px; }
+  .empty-note {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: #ad7f8f;
+  }
+
+  .research-count {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: 26px;
+    color: var(--ink);
+    line-height: 1.1;
+  }
+  .research-link {
+    display: inline-block;
+    margin-top: 6px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--teal);
+    text-decoration: none;
+  }
+  .research-link:hover { text-decoration: underline; }
+
+  .pop-freq-main {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: 22px;
+    color: var(--ink);
+    margin-bottom: 4px;
+  }
+
+  /* Variant checker */
+  .variant-box {
+    margin-top: 24px;
+    padding-top: 18px;
+    border-top: 1px solid var(--paper-dim);
+  }
+  .variant-form-row {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+  }
+  .variant-form-row input {
+    font-family: var(--mono);
+    font-size: 14px;
+    background: #fbe6ec;
+    border: 1px solid var(--paper-dim);
+    color: var(--ink);
+    padding: 10px 12px;
+    border-radius: 3px;
+    outline: none;
+    flex: 1;
+    min-width: 0;
+    text-transform: uppercase;
+  }
+  .variant-form-row input:focus { border-color: var(--amber); }
+  .variant-form-row button {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 500;
+    background: var(--ink);
+    color: var(--paper);
+    border: none;
+    padding: 0 16px;
+    border-radius: 3px;
+    cursor: pointer;
+  }
+  .variant-form-row button:disabled { opacity: 0.4; }
+  .variant-hint { font-size: 11.5px; color: #ad7f8f; margin: 6px 0 0; }
+  .variant-result { margin-top: 16px; display: none; }
+
+  .impact-badge {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: white;
+    padding: 4px 10px;
+    border-radius: 100px;
+    margin-bottom: 10px;
+  }
+  .impact-HIGH { background: var(--impact-high); }
+  .impact-MODERATE { background: var(--impact-moderate); }
+  .impact-LOW { background: var(--impact-low); }
+  .impact-MODIFIER { background: var(--impact-modifier); }
+
+  .consequence-title {
+    font-family: var(--serif);
+    font-size: 17px;
+    font-weight: 600;
+    margin-bottom: 10px;
+  }
+  .score-row { margin-bottom: 10px; }
+  .score-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    font-family: var(--mono);
+    margin-bottom: 3px;
+  }
+  .score-bar-track {
+    height: 6px;
+    background: var(--paper-dim);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .score-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+  }
+  .aa-change {
+    font-family: var(--mono);
+    font-size: 13.5px;
+    color: var(--teal);
+    margin-top: 8px;
+  }
+  .dna-change {
+    font-family: var(--mono);
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--ink);
+    margin-bottom: 10px;
+    letter-spacing: 0.02em;
+  }
+  .dna-change .base {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: var(--paper-dim);
+  }
+  .ref-preview {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: #ad7f8f;
+    margin: 6px 0 0;
+  }
+  .ref-preview .base {
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  @media (max-width: 480px) {
+    body { padding: 32px 16px 60px; }
+    .form-row { flex-wrap: wrap; }
+    select { flex: 1 1 100%; }
+    .card { padding: 22px 18px 18px; }
+    .gene-symbol { font-size: 26px; }
+  }
+</style>
+</head>
+<body>
+<div class="petals">
+  <div class="petal"></div>
+  <div class="petal"></div>
+  <div class="petal"></div>
+  <div class="petal"></div>
+  <div class="petal"></div>
+</div>
+<div class="wrap">
+  <div class="brand">K.Y.R.A.</div>
+  <div class="tagline">GENE LOCATOR · GRCh38</div>
+  <h1>Find what's at a position in the genome</h1>
+
+  <div class="lookup-modes">
+    <button class="mode-btn active" data-mode="position">By position</button>
+    <button class="mode-btn" data-mode="symbol">By gene name</button>
+  </div>
+
+  <div id="position-form">
+    <div class="form-row">
+      <select id="chrom"></select>
+      <input type="text" id="position" placeholder="140453136" inputmode="numeric" autocomplete="off">
+      <button class="go" id="go-position">Look up</button>
+    </div>
+    <div class="hint">e.g. chr7 : 140,453,136 — try it, that's BRAF</div>
+  </div>
+
+  <div id="symbol-form" style="display:none;">
+    <div class="form-row">
+      <input type="text" id="symbol" placeholder="e.g. BRCA1, TP53, BRAF" autocomplete="off">
+      <button class="go" id="go-symbol">Look up</button>
+    </div>
+    <div class="hint">searches by official gene symbol</div>
+  </div>
+
+  <div class="ideogram-box" id="ideogram-box">
+    <div class="ideogram-label" id="ideogram-label"></div>
+    <div class="ideogram-track">
+      <div class="ideogram-fill" id="ideogram-fill"></div>
+      <div class="ideogram-marker" id="ideogram-marker"></div>
+    </div>
+  </div>
+
+  <div class="status" id="status"></div>
+
+  <div class="card" id="card">
+    <div class="gene-symbol" id="r-symbol"></div>
+    <div class="gene-fullname" id="r-fullname"></div>
+    <div class="coords" id="r-coords"></div>
+    <div class="description" id="r-description"></div>
+    <div class="meta-grid" id="r-meta"></div>
+    <div class="links" id="r-links"></div>
+    <div class="other-genes" id="r-other"></div>
+
+    <div class="section-label">Research volume</div>
+    <div id="r-research"><span class="empty-note">Loading…</span></div>
+
+    <div class="section-label">Biological role</div>
+    <div id="r-go" class="tag-list"><span class="empty-note">Loading…</span></div>
+
+    <div class="section-label">Associated conditions</div>
+    <div id="r-phenotypes"><span class="empty-note">Loading…</span></div>
+
+    <div class="section-label">Interacts with</div>
+    <div id="r-interactions" class="tag-list"><span class="empty-note">Loading…</span></div>
+
+    <div class="variant-box">
+      <div class="section-label" style="margin-top:0;">Check a variant at this position</div>
+      <div class="variant-form-row">
+        <input type="text" id="variant-alt" placeholder="alt allele, e.g. T" maxlength="30">
+        <button id="go-variant">Predict effect</button>
+      </div>
+      <div class="variant-hint" id="variant-hint"></div>
+      <div class="ref-preview" id="ref-preview"></div>
+      <div class="status" id="variant-status"></div>
+      <div class="variant-result" id="variant-result">
+        <div class="dna-change" id="v-dna-change"></div>
+        <div class="impact-badge" id="v-impact-badge"></div>
+        <div class="consequence-title" id="v-consequence"></div>
+        <div class="aa-change" id="v-aa"></div>
+        <div id="v-scores"></div>
+        <div class="section-label" style="margin-top:14px;">Population frequency</div>
+        <div id="v-population"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const CHROM_LENGTHS = {
+  "1": 248956422, "2": 242193529, "3": 198295559, "4": 190214555, "5": 181538259,
+  "6": 170805979, "7": 159345973, "8": 145138636, "9": 138394717, "10": 133797422,
+  "11": 135086622, "12": 133275309, "13": 114364328, "14": 107043718, "15": 101991189,
+  "16": 90338345, "17": 83257441, "18": 80373285, "19": 58617616, "20": 64444167,
+  "21": 46709983, "22": 50818468, "X": 156040895, "Y": 57227415, "MT": 16569
+};
+
+const chromSelect = document.getElementById('chrom');
+Object.keys(CHROM_LENGTHS).forEach(c => {
+  const opt = document.createElement('option');
+  opt.value = c;
+  opt.textContent = 'chr' + c;
+  chromSelect.appendChild(opt);
+});
+chromSelect.value = "7";
+
+const modeButtons = document.querySelectorAll('.mode-btn');
+const positionForm = document.getElementById('position-form');
+const symbolForm = document.getElementById('symbol-form');
+modeButtons.forEach(btn => {
+  btn.addEventListener('click', () => {
+    modeButtons.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const mode = btn.dataset.mode;
+    positionForm.style.display = mode === 'position' ? 'block' : 'none';
+    symbolForm.style.display = mode === 'symbol' ? 'block' : 'none';
+    clearStatus();
+    hideCard();
+  });
+});
+
+const statusEl = document.getElementById('status');
+const cardEl = document.getElementById('card');
+const ideogramBox = document.getElementById('ideogram-box');
+
+function setStatus(msg, isError) {
+  statusEl.textContent = msg;
+  statusEl.className = 'status' + (isError ? ' error' : '');
+}
+function clearStatus() { statusEl.textContent = ''; statusEl.className = 'status'; }
+function hideCard() { cardEl.style.display = 'none'; }
+function showCard() { cardEl.style.display = 'block'; }
+
+function showIdeogram(chrom, pos) {
+  const len = CHROM_LENGTHS[chrom];
+  if (!len) { ideogramBox.style.display = 'none'; return; }
+  const pct = Math.min(100, Math.max(0, (pos / len) * 100));
+  document.getElementById('ideogram-label').textContent =
+    'chr' + chrom + ' — position ' + pos.toLocaleString() + ' of ' + len.toLocaleString();
+  document.getElementById('ideogram-fill').style.width = pct + '%';
+  document.getElementById('ideogram-marker').style.left = pct + '%';
+  ideogramBox.style.display = 'block';
+}
+
+const EBASE = 'https://rest.ensembl.org';
+
+async function ensemblGet(path) {
+  let res;
+  try {
+    res = await fetch(EBASE + path, { headers: { 'Content-Type': 'application/json' } });
+  } catch (networkErr) {
+    throw new Error('Could not reach Ensembl. If you opened this file from Downloads, try opening it as a real web page instead (see note below) — local files are often blocked from making network requests. (' + networkErr.message + ')');
+  }
+  if (!res.ok) {
+    if (res.status === 400) throw new Error('Nothing found for that request.');
+    throw new Error('Ensembl returned an error (' + res.status + ').');
+  }
+  return res.json();
+}
+
+let currentVariantChrom = null, currentVariantPos = null, currentVariantGeneId = null, currentRefBase = null;
+
+async function fetchRefSequence(chrom, pos, length) {
+  const res = await fetch(EBASE + '/sequence/region/human/' + chrom + ':' + pos + '-' + (pos + length - 1) + '?content-type=text/plain');
+  if (!res.ok) throw new Error('Could not look up the reference base.');
+  return (await res.text()).trim().toUpperCase();
+}
+
+async function loadGO(geneId) {
+  const el = document.getElementById('r-go');
+  el.innerHTML = '<span class="empty-note">Loading…</span>';
+  try {
+    const xrefs = await ensemblGet('/xrefs/id/' + geneId + '?content-type=application/json&external_db=GO&all_levels=0');
+    const descs = [...new Set(xrefs.map(x => x.description).filter(Boolean))].slice(0, 6);
+    if (!descs.length) { el.innerHTML = '<span class="empty-note">No GO terms on record.</span>'; return; }
+    el.innerHTML = '';
+    descs.forEach(d => {
+      const span = document.createElement('span');
+      span.className = 'tag';
+      span.textContent = d;
+      el.appendChild(span);
+    });
+  } catch (e) {
+    el.innerHTML = '<span class="empty-note">Couldn\u2019t load GO terms.</span>';
+  }
+}
+
+async function loadPhenotypes(geneId) {
+  const el = document.getElementById('r-phenotypes');
+  el.innerHTML = '<span class="empty-note">Loading…</span>';
+  try {
+    const data = await ensemblGet('/phenotype/gene/homo_sapiens/' + geneId + '?content-type=application/json&include_associated=0');
+    const descs = [...new Set(data.map(p => p.description).filter(Boolean))].slice(0, 10);
+    if (!descs.length) { el.innerHTML = '<span class="empty-note">No phenotype or disease associations on record in Ensembl.</span>'; return; }
+    const ul = document.createElement('ul');
+    ul.className = 'plain-list';
+    descs.forEach(d => {
+      const li = document.createElement('li');
+      li.textContent = d;
+      ul.appendChild(li);
+    });
+    el.innerHTML = '';
+    el.appendChild(ul);
+  } catch (e) {
+    el.innerHTML = '<span class="empty-note">No phenotype data available.</span>';
+  }
+}
+
+async function loadInteractions(symbol) {
+  const el = document.getElementById('r-interactions');
+  el.innerHTML = '<span class="empty-note">Loading…</span>';
+  try {
+    const idRes = await fetch('https://string-db.org/api/json/get_string_ids?identifiers=' + encodeURIComponent(symbol) + '&species=9606&limit=1');
+    if (!idRes.ok) throw new Error('lookup failed');
+    const idData = await idRes.json();
+    if (!idData.length) { el.innerHTML = '<span class="empty-note">No interaction data found for this gene.</span>'; return; }
+    const stringId = idData[0].stringId;
+    const partnersRes = await fetch('https://string-db.org/api/json/interaction_partners?identifiers=' + encodeURIComponent(stringId) + '&species=9606&limit=10');
+    if (!partnersRes.ok) throw new Error('partners failed');
+    const partners = await partnersRes.json();
+    const names = [...new Set(partners.map(p => {
+      const a = p.preferredName_A, b = p.preferredName_B;
+      return (a && a.toUpperCase() !== symbol.toUpperCase()) ? a : b;
+    }).filter(Boolean))].slice(0, 10);
+    if (!names.length) { el.innerHTML = '<span class="empty-note">No known interaction partners.</span>'; return; }
+    el.innerHTML = '';
+    names.forEach(n => {
+      const btn = document.createElement('button');
+      btn.className = 'tag clickable';
+      btn.textContent = n;
+      btn.addEventListener('click', () => {
+        document.querySelector('.mode-btn[data-mode="symbol"]').click();
+        document.getElementById('symbol').value = n;
+        lookupBySymbol(n);
+      });
+      el.appendChild(btn);
+    });
+  } catch (e) {
+    el.innerHTML = '<span class="empty-note">Interaction data unavailable right now (STRING-db).</span>';
+  }
+}
+
+async function loadResearchVolume(geneId, symbol) {
+  const el = document.getElementById('r-research');
+  el.innerHTML = '<span class="empty-note">Loading…</span>';
+  try {
+    let count = null;
+    try {
+      const xrefs = await ensemblGet('/xrefs/id/' + geneId + '?content-type=application/json&external_db=EntrezGene');
+      const entrez = xrefs.find(x => x.primary_id);
+      if (entrez) {
+        const linkRes = await fetch('https://eutils.ncbi.nlm.nih.gov/entrez/eutils/elink.fcgi?dbfrom=gene&db=pubmed&id=' + entrez.primary_id + '&retmode=json');
+        if (linkRes.ok) {
+          const linkData = await linkRes.json();
+          const linksetdbs = linkData.linksets && linkData.linksets[0] && linkData.linksets[0].linksetdbs;
+          if (linksetdbs && linksetdbs[0] && linksetdbs[0].links) count = linksetdbs[0].links.length;
+        }
+      }
+    } catch (e) {}
+
+    if (count === null) {
+      const res = await fetch('https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=' + encodeURIComponent(symbol + '[Title/Abstract]') + '&retmode=json');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.esearchresult && data.esearchresult.count !== undefined) count = parseInt(data.esearchresult.count, 10);
+      }
+    }
+    if (count === null || isNaN(count)) throw new Error('unavailable');
+
+    el.innerHTML = '';
+    const big = document.createElement('div');
+    big.className = 'research-count';
+    big.textContent = count.toLocaleString();
+    el.appendChild(big);
+    const label = document.createElement('div');
+    label.className = 'empty-note';
+    label.textContent = 'PubMed articles linked to this gene';
+    el.appendChild(label);
+    const link = document.createElement('a');
+    link.href = 'https://pubmed.ncbi.nlm.nih.gov/?term=' + encodeURIComponent(symbol + '[Gene]');
+    link.target = '_blank'; link.rel = 'noopener';
+    link.className = 'research-link';
+    link.textContent = 'Browse on PubMed ↗';
+    el.appendChild(link);
+  } catch (e) {
+    el.innerHTML = '<span class="empty-note">Research volume unavailable right now.</span>';
+  }
+}
+
+async function loadPopulationFrequency(chrom, pos, ref, alt) {
+  const el = document.getElementById('v-population');
+  if (!el) return;
+  el.innerHTML = '<span class="empty-note">Checking population databases…</span>';
+  try {
+    const variantId = chrom + '-' + pos + '-' + ref + '-' + alt;
+    const query = 'query($variantId: String!, $datasetId: DatasetId!) { variant(variantId: $variantId, dataset: $datasetId) { genome { af an ac homozygote_count } } }';
+    const gRes = await fetch('https://gnomad.broadinstitute.org/api', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, variables: { variantId, datasetId: 'gnomad_r4' } })
+    });
+    if (!gRes.ok) throw new Error('gnomad request failed');
+    const gData = await gRes.json();
+    const genome = gData.data && gData.data.variant && gData.data.variant.genome;
+    if (!genome || genome.af === null || genome.af === undefined) {
+      el.innerHTML = '<span class="empty-note">Not observed in gnomAD — likely very rare, novel, or outside its coverage.</span>';
+      return;
+    }
+    const afPct = genome.af * 100;
+    const afDisplay = afPct < 0.001 ? genome.af.toExponential(2) : afPct.toFixed(3) + '%';
+    el.innerHTML =
+      '<div class="pop-freq-main">' + afDisplay + (afPct < 0.001 ? ' allele frequency' : ' of alleles') + '</div>' +
+      '<div class="empty-note">' + genome.ac.toLocaleString() + ' of ' + genome.an.toLocaleString() +
+      ' alleles observed (gnomAD v4) · ' + genome.homozygote_count.toLocaleString() + ' people homozygous</div>';
+  } catch (e) {
+    el.innerHTML = '<span class="empty-note">Population frequency unavailable right now (gnomAD).</span>';
+  }
+}
+
+function wireVariantChecker(chrom, pos, geneId) {
+  currentVariantChrom = chrom;
+  currentVariantPos = pos;
+  currentVariantGeneId = geneId;
+  currentRefBase = null;
+  document.getElementById('variant-hint').textContent =
+    'at chr' + chrom + ':' + pos.toLocaleString() + ' — enter the alternate base to predict effect';
+  document.getElementById('ref-preview').innerHTML = 'Looking up the reference base…';
+  document.getElementById('variant-alt').value = '';
+  document.getElementById('variant-status').textContent = '';
+  document.getElementById('variant-status').className = 'status';
+  document.getElementById('variant-result').style.display = 'none';
+  document.getElementById('v-population').innerHTML = '';
+
+  fetchRefSequence(chrom, pos, 1).then(ref => {
+    currentRefBase = ref;
+    document.getElementById('ref-preview').innerHTML =
+      'Reference base here is <span class="base">' + ref + '</span> — type a different letter (A, C, G, or T) to test a change.';
+  }).catch(() => {
+    document.getElementById('ref-preview').textContent = '';
+  });
+}
+
+function renderVariantResult(v, ref, alt) {
+  const dnaEl = document.getElementById('v-dna-change');
+  dnaEl.innerHTML = '<span class="base">' + ref + '</span> → <span class="base">' + alt + '</span>';
+
+  const tcs = v.transcript_consequences || [];
+  let tc = tcs.find(t => t.gene_id === currentVariantGeneId && t.sift_score !== undefined) ||
+           tcs.find(t => t.gene_id === currentVariantGeneId) ||
+           tcs.find(t => t.sift_score !== undefined || t.polyphen_score !== undefined) ||
+           tcs[0];
+
+  const mostSevere = (tc && tc.consequence_terms && tc.consequence_terms[0]) || v.most_severe_consequence || 'unknown';
+  document.getElementById('v-consequence').textContent = mostSevere.replace(/_/g, ' ');
+
+  const impact = (tc && tc.impact) || 'MODIFIER';
+  const badge = document.getElementById('v-impact-badge');
+  badge.textContent = impact;
+  badge.className = 'impact-badge impact-' + impact;
+
+  const aaEl = document.getElementById('v-aa');
+  if (tc && tc.amino_acids && tc.protein_start) {
+    const aas = tc.amino_acids.split('/');
+    aaEl.textContent = aas.length === 2
+      ? 'Protein change: ' + aas[0] + tc.protein_start + aas[1]
+      : 'Protein position ' + tc.protein_start + ': ' + tc.amino_acids;
+    aaEl.style.display = 'block';
+  } else {
+    aaEl.style.display = 'none';
+  }
+
+  const scoresEl = document.getElementById('v-scores');
+  scoresEl.innerHTML = '';
+  function scoreBar(label, score, prediction, color) {
+    const wrap = document.createElement('div');
+    wrap.className = 'score-row';
+    const pct = Math.round(score * 100);
+    wrap.innerHTML =
+      '<div class="score-label"><span>' + label + ' \u2014 ' + prediction + '</span><span>' + score.toFixed(2) + '</span></div>' +
+      '<div class="score-bar-track"><div class="score-bar-fill" style="width:' + pct + '%; background:' + color + ';"></div></div>';
+    scoresEl.appendChild(wrap);
+  }
+  if (tc && tc.sift_score !== undefined) {
+    const color = tc.sift_score < 0.05 ? 'var(--impact-high)' : tc.sift_score < 0.3 ? 'var(--impact-moderate)' : 'var(--impact-low)';
+    scoreBar('SIFT', tc.sift_score, tc.sift_prediction, color);
+  }
+  if (tc && tc.polyphen_score !== undefined) {
+    const color = tc.polyphen_score > 0.85 ? 'var(--impact-high)' : tc.polyphen_score > 0.45 ? 'var(--impact-moderate)' : 'var(--impact-low)';
+    scoreBar('PolyPhen', tc.polyphen_score, tc.polyphen_prediction, color);
+  }
+  if (!scoresEl.children.length) {
+    scoresEl.innerHTML = '<div class="empty-note">No SIFT/PolyPhen score for this transcript \u2014 usually only scored for missense changes in protein-coding genes.</div>';
+  }
+  document.getElementById('variant-result').style.display = 'block';
+}
+
+document.getElementById('go-variant').addEventListener('click', async () => {
+  const alt = document.getElementById('variant-alt').value.trim().toUpperCase();
+  const vStatus = document.getElementById('variant-status');
+  const vBtn = document.getElementById('go-variant');
+  if (!alt || !/^[ACGT]+$/.test(alt)) {
+    vStatus.textContent = 'Enter a valid allele using A, C, G, T.';
+    vStatus.className = 'status error';
+    return;
+  }
+  if (!currentVariantChrom || !currentVariantPos) {
+    vStatus.textContent = 'Look up a gene first.';
+    vStatus.className = 'status error';
+    return;
+  }
+  vBtn.disabled = true;
+  vStatus.textContent = 'Looking up the reference base…';
+  vStatus.className = 'status';
+  document.getElementById('variant-result').style.display = 'none';
+  try {
+    const ref = alt.length === 1 && currentRefBase ? currentRefBase : await fetchRefSequence(currentVariantChrom, currentVariantPos, alt.length);
+    if (ref === alt) {
+      vStatus.textContent = 'That\u2019s the same as the reference base (' + ref + ') \u2014 not a change. Try a different letter.';
+      vStatus.className = 'status error';
+      return;
+    }
+    vStatus.textContent = 'Predicting…';
+    const region = currentVariantChrom + ':' + currentVariantPos + '-' + (currentVariantPos + alt.length - 1) + ':1';
+    const data = await ensemblGet('/vep/human/region/' + region + '/' + alt + '?content-type=application/json');
+    if (!data.length) throw new Error('No prediction available for this variant.');
+    renderVariantResult(data[0], ref, alt);
+    vStatus.textContent = '';
+    loadPopulationFrequency(currentVariantChrom, currentVariantPos, ref, alt);
+  } catch (err) {
+    vStatus.textContent = err.message;
+    vStatus.className = 'status error';
+  } finally {
+    vBtn.disabled = false;
+  }
+});
+
+window.addEventListener('unhandledrejection', e => {
+  setStatus('Unexpected error: ' + (e.reason && e.reason.message ? e.reason.message : e.reason), true);
+  document.getElementById('go-position').disabled = false;
+  document.getElementById('go-symbol').disabled = false;
+});
+window.addEventListener('error', e => {
+  setStatus('Script error: ' + e.message, true);
+});
+
+function renderGene(gene, xrefs, allGenesAtPos, searchedPos) {
+  document.getElementById('r-symbol').textContent = gene.display_name || gene.id;
+  document.getElementById('r-fullname').textContent = gene.description
+    ? gene.description.replace(/\s*\[Source:.*?\]\s*$/, '')
+    : '';
+  document.getElementById('r-coords').textContent =
+    'chr' + gene.seq_region_name + ':' + gene.start.toLocaleString() + '–' + gene.end.toLocaleString() +
+    '  (' + (gene.strand === 1 ? '+ strand' : '− strand') + ')';
+  document.getElementById('r-description').textContent = gene.description
+    ? ''
+    : 'No description available from Ensembl for this gene.';
+  document.getElementById('r-description').style.display = gene.description ? 'none' : 'block';
+
+  const meta = document.getElementById('r-meta');
+  meta.innerHTML = '';
+  const metaItems = [
+    ['Biotype', gene.biotype],
+    ['Ensembl ID', gene.id],
+    ['Length', (gene.end - gene.start + 1).toLocaleString() + ' bp'],
+    ['Source', gene.source]
+  ];
+  metaItems.forEach(([k, v]) => {
+    if (!v) return;
+    const div = document.createElement('div');
+    div.className = 'meta-item';
+    div.innerHTML = '<div class="k">' + k + '</div><div class="v">' + v + '</div>';
+    meta.appendChild(div);
+  });
+
+  const linksEl = document.getElementById('r-links');
+  linksEl.innerHTML = '';
+  const links = [
+    ['Ensembl', 'https://www.ensembl.org/Homo_sapiens/Gene/Summary?g=' + gene.id],
+    ['NCBI Gene', 'https://www.ncbi.nlm.nih.gov/gene/?term=' + encodeURIComponent(gene.display_name || gene.id)],
+    ['GeneCards', 'https://www.genecards.org/cgi-bin/carddisp.pl?gene=' + encodeURIComponent(gene.display_name || gene.id)]
+  ];
+  const uniprot = (xrefs || []).find(x => x.dbname === 'Uniprot/SWISSPROT' || x.dbname === 'UniProtKB/Swiss-Prot');
+  if (uniprot) links.push(['UniProt', 'https://www.uniprot.org/uniprotkb/' + uniprot.primary_id]);
+  const omim = (xrefs || []).find(x => x.dbname === 'MIM_GENE' || x.dbname === 'OMIM');
+  if (omim) links.push(['OMIM', 'https://omim.org/entry/' + omim.primary_id]);
+
+  links.forEach(([label, url]) => {
+    const a = document.createElement('a');
+    a.href = url; a.target = '_blank'; a.rel = 'noopener';
+    a.textContent = label + ' ↗';
+    linksEl.appendChild(a);
+  });
+
+  const otherEl = document.getElementById('r-other');
+  otherEl.innerHTML = '';
+  if (allGenesAtPos && allGenesAtPos.length > 1) {
+    const others = allGenesAtPos.filter(g => g.id !== gene.id);
+    if (others.length) {
+      otherEl.textContent = 'Also overlapping this position: ';
+      others.forEach((g, i) => {
+        const btn = document.createElement('button');
+        btn.textContent = g.external_name || g.gene_id || g.id;
+        btn.addEventListener('click', () => loadGeneById(g.gene_id || g.id, allGenesAtPos));
+        otherEl.appendChild(btn);
+        if (i < others.length - 1) otherEl.appendChild(document.createTextNode(', '));
+      });
+    }
+  }
+
+  wireVariantChecker(gene.seq_region_name, searchedPos || gene.start, gene.id);
+  loadGO(gene.id);
+  loadPhenotypes(gene.id);
+  loadInteractions(gene.display_name || gene.id);
+  loadResearchVolume(gene.id, gene.display_name || gene.id);
+
+  showCard();
+}
+
+async function loadGeneById(geneId, allGenesAtPos, searchedPos) {
+  setStatus('Loading gene details…');
+  try {
+    const gene = await ensemblGet('/lookup/id/' + geneId + '?content-type=application/json&expand=0');
+    let xrefs = [];
+    try { xrefs = await ensemblGet('/xrefs/id/' + geneId + '?content-type=application/json'); } catch (e) {}
+    clearStatus();
+    renderGene(gene, xrefs, allGenesAtPos, searchedPos);
+  } catch (err) {
+    setStatus(err.message, true);
+    hideCard();
+  }
+}
+
+async function lookupByPosition(chrom, pos) {
+  hideCard();
+  showIdeogram(chrom, pos);
+  setStatus('Searching chr' + chrom + ':' + pos.toLocaleString() + '…');
+  const goBtn = document.getElementById('go-position');
+  goBtn.disabled = true;
+  try {
+    const region = chrom + ':' + Math.max(1, pos - 1) + '-' + (pos + 1);
+    const genes = await ensemblGet('/overlap/region/human/' + region + '?feature=gene&content-type=application/json');
+    if (!genes.length) {
+      setStatus('No gene at that position — it may be in an intergenic region.', true);
+      return;
+    }
+    const primary = genes.find(g => g.biotype === 'protein_coding') || genes[0];
+    setStatus('');
+    await loadGeneById(primary.gene_id || primary.id, genes, pos);
+  } catch (err) {
+    setStatus(err.message, true);
+  } finally {
+    goBtn.disabled = false;
+  }
+}
+
+async function lookupBySymbol(symbol) {
+  hideCard();
+  ideogramBox.style.display = 'none';
+  setStatus('Searching for ' + symbol + '…');
+  const goBtn = document.getElementById('go-symbol');
+  goBtn.disabled = true;
+  try {
+    const gene = await ensemblGet('/lookup/symbol/human/' + encodeURIComponent(symbol) + '?content-type=application/json&expand=0');
+    if (gene.seq_region_name) showIdeogram(gene.seq_region_name, gene.start);
+    let xrefs = [];
+    try { xrefs = await ensemblGet('/xrefs/id/' + gene.id + '?content-type=application/json'); } catch (e) {}
+    clearStatus();
+    renderGene(gene, xrefs, null);
+  } catch (err) {
+    setStatus("Couldn't find a gene with that symbol.", true);
+  } finally {
+    goBtn.disabled = false;
+  }
+}
+
+document.getElementById('go-position').addEventListener('click', () => {
+  const chrom = chromSelect.value;
+  const raw = document.getElementById('position').value.replace(/[,\s]/g, '');
+  const pos = parseInt(raw, 10);
+  if (!raw || isNaN(pos) || pos < 1) {
+    setStatus('Enter a valid position number.', true);
+    return;
+  }
+  lookupByPosition(chrom, pos);
+});
+
+document.getElementById('go-symbol').addEventListener('click', () => {
+  const symbol = document.getElementById('symbol').value.trim();
+  if (!symbol) { setStatus('Enter a gene symbol.', true); return; }
+  lookupBySymbol(symbol);
+});
+
+document.getElementById('position').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('go-position').click();
+});
+document.getElementById('symbol').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('go-symbol').click();
+});
+</script>
+</body>
+</html>
