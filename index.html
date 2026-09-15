@@ -54,6 +54,35 @@
     color: var(--band-mid);
     margin-bottom: 4px;
   }
+  .brand-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .build-toggle {
+    display: flex;
+    gap: 2px;
+    flex-shrink: 0;
+  }
+  .build-btn {
+    background: transparent;
+    border: 1px solid var(--band-dark);
+    color: var(--band-mid);
+    font-family: var(--mono);
+    font-size: 10.5px;
+    padding: 5px 9px;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+  }
+  .build-btn:first-child { border-radius: 3px 0 0 3px; }
+  .build-btn:last-child { border-radius: 0 3px 3px 0; margin-left: -1px; }
+  .build-btn.active {
+    color: var(--ink);
+    background: var(--amber);
+    border-color: var(--amber);
+  }
 
   h1 {
     font-family: var(--serif);
@@ -184,6 +213,84 @@
     padding: 8px 0;
   }
   .status.error { color: var(--err); }
+
+  .intergenic-box {
+    margin-bottom: 24px;
+  }
+  .reg-feature {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--paper);
+    background: var(--ink-soft);
+    border: 1px solid var(--band-dark);
+    padding: 8px 12px;
+    border-radius: 4px;
+    margin-bottom: 6px;
+  }
+  .reg-feature .rf-type {
+    font-weight: 600;
+    color: var(--amber);
+    margin-right: 8px;
+  }
+  .mini-gene-card {
+    background: var(--paper);
+    color: var(--ink);
+    border-radius: 6px;
+    padding: 16px 18px;
+    margin-bottom: 10px;
+  }
+  .mini-gene-card .mg-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 4px;
+  }
+  .mini-gene-card .mg-symbol {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: 19px;
+  }
+  .mini-gene-card .mg-distance {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--teal);
+    white-space: nowrap;
+  }
+  .mini-gene-card .mg-meta {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: #ad7f8f;
+    margin-bottom: 8px;
+  }
+  .mini-gene-card .mg-desc {
+    font-family: var(--serif);
+    font-size: 14px;
+    line-height: 1.5;
+    margin: 0 0 10px;
+  }
+  .mini-gene-card .mg-function-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #ad7f8f;
+    margin-bottom: 6px;
+  }
+  .mini-gene-card .mg-function {
+    margin-bottom: 12px;
+  }
+  .mini-gene-card button.mg-view {
+    font-family: var(--mono);
+    font-size: 12px;
+    background: var(--paper-dim);
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    color: var(--ink);
+    transition: background 0.15s;
+  }
+  .mini-gene-card button.mg-view:hover { background: #efc6d5; }
 
   /* Result card */
   .card {
@@ -495,8 +602,16 @@
   <div class="petal"></div>
 </div>
 <div class="wrap">
-  <div class="brand">K.Y.R.A.</div>
-  <div class="tagline">GENE LOCATOR · GRCh38</div>
+  <div class="brand-row">
+    <div>
+      <div class="brand">K.Y.R.A.</div>
+      <div class="tagline" id="tagline">GENE LOCATOR · GRCh38</div>
+    </div>
+    <div class="build-toggle">
+      <button class="build-btn active" data-build="GRCh38">GRCh38</button>
+      <button class="build-btn" data-build="GRCh37">GRCh37 (hg19)</button>
+    </div>
+  </div>
   <h1>Find what's at a position in the genome</h1>
 
   <div class="lookup-modes">
@@ -510,7 +625,7 @@
       <input type="text" id="position" placeholder="140453136" inputmode="numeric" autocomplete="off">
       <button class="go" id="go-position">Look up</button>
     </div>
-    <div class="hint">e.g. chr7 : 140,453,136 — try it, that's BRAF</div>
+    <div class="hint" id="position-hint"></div>
   </div>
 
   <div id="symbol-form" style="display:none;">
@@ -530,6 +645,12 @@
   </div>
 
   <div class="status" id="status"></div>
+  <div class="intergenic-box" id="intergenic-box" style="display:none;">
+    <div class="section-label" style="margin-top:0;">At this position</div>
+    <div id="ig-regulatory"></div>
+    <div class="section-label">Nearest genes</div>
+    <div id="ig-genes"></div>
+  </div>
 
   <div class="card" id="card">
     <div class="gene-symbol" id="r-symbol"></div>
@@ -575,22 +696,60 @@
 </div>
 
 <script>
-const CHROM_LENGTHS = {
-  "1": 248956422, "2": 242193529, "3": 198295559, "4": 190214555, "5": 181538259,
-  "6": 170805979, "7": 159345973, "8": 145138636, "9": 138394717, "10": 133797422,
-  "11": 135086622, "12": 133275309, "13": 114364328, "14": 107043718, "15": 101991189,
-  "16": 90338345, "17": 83257441, "18": 80373285, "19": 58617616, "20": 64444167,
-  "21": 46709983, "22": 50818468, "X": 156040895, "Y": 57227415, "MT": 16569
+const CHROM_LENGTHS_BY_BUILD = {
+  GRCh38: {
+    "1": 248956422, "2": 242193529, "3": 198295559, "4": 190214555, "5": 181538259,
+    "6": 170805979, "7": 159345973, "8": 145138636, "9": 138394717, "10": 133797422,
+    "11": 135086622, "12": 133275309, "13": 114364328, "14": 107043718, "15": 101991189,
+    "16": 90338345, "17": 83257441, "18": 80373285, "19": 58617616, "20": 64444167,
+    "21": 46709983, "22": 50818468, "X": 156040895, "Y": 57227415, "MT": 16569
+  },
+  GRCh37: {
+    "1": 249250621, "2": 243199373, "3": 198022430, "4": 191154276, "5": 180915260,
+    "6": 171115067, "7": 159138663, "8": 146364022, "9": 141213431, "10": 135534747,
+    "11": 135006516, "12": 133851895, "13": 115169878, "14": 107349540, "15": 102531392,
+    "16": 90354753, "17": 81195210, "18": 78077248, "19": 59128983, "20": 63025520,
+    "21": 48129895, "22": 51304566, "X": 155270560, "Y": 59373566, "MT": 16569
+  }
 };
 
+let currentBuild = 'GRCh38';
+function currentChromLengths() { return CHROM_LENGTHS_BY_BUILD[currentBuild]; }
+function ebaseFor(build) { return build === 'GRCh37' ? 'https://grch37.rest.ensembl.org' : 'https://rest.ensembl.org'; }
+
 const chromSelect = document.getElementById('chrom');
-Object.keys(CHROM_LENGTHS).forEach(c => {
+Object.keys(CHROM_LENGTHS_BY_BUILD.GRCh38).forEach(c => {
   const opt = document.createElement('option');
   opt.value = c;
   opt.textContent = 'chr' + c;
   chromSelect.appendChild(opt);
 });
 chromSelect.value = "7";
+
+function updatePositionHint() {
+  const hintEl = document.getElementById('position-hint');
+  hintEl.textContent = currentBuild === 'GRCh37'
+    ? 'e.g. chr7 : 140,453,136 — that\u2019s the BRAF V600E hotspot'
+    : 'e.g. chr7 : 140,753,336 — that\u2019s the BRAF V600E hotspot';
+}
+updatePositionHint();
+
+document.querySelectorAll('.build-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (btn.dataset.build === currentBuild) return;
+    document.querySelectorAll('.build-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentBuild = btn.dataset.build;
+    EBASE = ebaseFor(currentBuild);
+    document.getElementById('tagline').textContent =
+      'GENE LOCATOR · ' + currentBuild + (currentBuild === 'GRCh37' ? ' (hg19)' : '');
+    updatePositionHint();
+    hideCard();
+    document.getElementById('intergenic-box').style.display = 'none';
+    ideogramBox.style.display = 'none';
+    clearStatus();
+  });
+});
 
 const modeButtons = document.querySelectorAll('.mode-btn');
 const positionForm = document.getElementById('position-form');
@@ -620,7 +779,7 @@ function hideCard() { cardEl.style.display = 'none'; }
 function showCard() { cardEl.style.display = 'block'; }
 
 function showIdeogram(chrom, pos) {
-  const len = CHROM_LENGTHS[chrom];
+  const len = currentChromLengths()[chrom];
   if (!len) { ideogramBox.style.display = 'none'; return; }
   const pct = Math.min(100, Math.max(0, (pos / len) * 100));
   document.getElementById('ideogram-label').textContent =
@@ -630,7 +789,7 @@ function showIdeogram(chrom, pos) {
   ideogramBox.style.display = 'block';
 }
 
-const EBASE = 'https://rest.ensembl.org';
+let EBASE = ebaseFor(currentBuild);
 
 async function ensemblGet(path) {
   let res;
@@ -785,7 +944,7 @@ async function loadPopulationFrequency(chrom, pos, ref, alt) {
     const gRes = await fetch('https://gnomad.broadinstitute.org/api', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query, variables: { variantId, datasetId: 'gnomad_r4' } })
+      body: JSON.stringify({ query, variables: { variantId, datasetId: currentBuild === 'GRCh37' ? 'gnomad_r2_1' : 'gnomad_r4' } })
     });
     if (!gRes.ok) throw new Error('gnomad request failed');
     const gData = await gRes.json();
@@ -799,7 +958,7 @@ async function loadPopulationFrequency(chrom, pos, ref, alt) {
     el.innerHTML =
       '<div class="pop-freq-main">' + afDisplay + (afPct < 0.001 ? ' allele frequency' : ' of alleles') + '</div>' +
       '<div class="empty-note">' + genome.ac.toLocaleString() + ' of ' + genome.an.toLocaleString() +
-      ' alleles observed (gnomAD v4) · ' + genome.homozygote_count.toLocaleString() + ' people homozygous</div>';
+      ' alleles observed (gnomAD ' + (currentBuild === 'GRCh37' ? 'v2.1' : 'v4') + ') · ' + genome.homozygote_count.toLocaleString() + ' people homozygous</div>';
   } catch (e) {
     el.innerHTML = '<span class="empty-note">Population frequency unavailable right now (gnomAD).</span>';
   }
@@ -1018,8 +1177,115 @@ async function loadGeneById(geneId, allGenesAtPos, searchedPos) {
   }
 }
 
+async function loadRegulatoryAt(chrom, pos) {
+  const el = document.getElementById('ig-regulatory');
+  el.innerHTML = '<span class="empty-note">Checking regulatory annotations…</span>';
+  try {
+    const feats = await ensemblGet('/overlap/region/human/' + chrom + ':' + pos + '-' + pos + '?feature=regulatory&content-type=application/json');
+    if (!feats.length) {
+      el.innerHTML = '<span class="empty-note">No regulatory element annotated exactly here \u2014 but plenty of intergenic DNA still has a function we just don\u2019t have annotated yet.</span>';
+      return;
+    }
+    el.innerHTML = '';
+    feats.forEach(f => {
+      const div = document.createElement('div');
+      div.className = 'reg-feature';
+      const type = (f.feature_type || 'Regulatory feature').replace(/_/g, ' ');
+      const detail = f.description || f.bound_start ? (f.description || ('chr' + f.seq_region_name + ':' + f.start + '\u2013' + f.end)) : (f.id || '');
+      div.innerHTML = '<span class="rf-type">' + type + '</span>' + detail;
+      el.appendChild(div);
+    });
+  } catch (e) {
+    el.innerHTML = '<span class="empty-note">Regulatory data unavailable right now.</span>';
+  }
+}
+
+async function renderMiniGene(geneId, distanceLabel, container) {
+  try {
+    const gene = await ensemblGet('/lookup/id/' + geneId + '?content-type=application/json&expand=0');
+    const desc = gene.description ? gene.description.replace(/\s*\[Source:.*?\]\s*$/, '') : 'No description available from Ensembl for this gene.';
+    const div = document.createElement('div');
+    div.className = 'mini-gene-card';
+    div.innerHTML =
+      '<div class="mg-header"><span class="mg-symbol">' + (gene.display_name || gene.id) + '</span><span class="mg-distance">' + distanceLabel + '</span></div>' +
+      '<div class="mg-meta">' + gene.biotype + ' \u00b7 chr' + gene.seq_region_name + ':' + gene.start.toLocaleString() + '\u2013' + gene.end.toLocaleString() + '</div>' +
+      '<div class="mg-desc">' + desc + '</div>' +
+      '<div class="mg-function-label">What it does</div>' +
+      '<div class="tag-list mg-function"><span class="empty-note">Loading…</span></div>';
+    const btn = document.createElement('button');
+    btn.className = 'mg-view';
+    btn.textContent = 'View full details \u2192';
+    btn.addEventListener('click', () => loadGeneById(gene.id, null));
+    div.appendChild(btn);
+    container.appendChild(div);
+
+    const funcEl = div.querySelector('.mg-function');
+    try {
+      const xrefs = await ensemblGet('/xrefs/id/' + gene.id + '?content-type=application/json&external_db=GO&all_levels=0');
+      const descs = [...new Set(xrefs.map(x => x.description).filter(Boolean))].slice(0, 5);
+      if (!descs.length) {
+        funcEl.innerHTML = '<span class="empty-note">No GO terms on record for this gene.</span>';
+      } else {
+        funcEl.innerHTML = '';
+        descs.forEach(d => {
+          const span = document.createElement('span');
+          span.className = 'tag';
+          span.textContent = d;
+          funcEl.appendChild(span);
+        });
+      }
+    } catch (e) {
+      funcEl.innerHTML = '<span class="empty-note">Couldn\u2019t load function terms.</span>';
+    }
+  } catch (e) {
+    // skip silently if one side fails to load
+  }
+}
+
+async function loadNearestGeneDetails(chrom, pos) {
+  const el = document.getElementById('ig-genes');
+  el.innerHTML = '<span class="empty-note">Looking for the nearest genes…</span>';
+  try {
+    const windowSize = 2000000;
+    const start = Math.max(1, Math.round(pos - windowSize / 2));
+    const end = Math.round(pos + windowSize / 2);
+    const genes = await ensemblGet('/overlap/region/human/' + chrom + ':' + start + '-' + end + '?feature=gene&content-type=application/json');
+    let upstream = null, downstream = null;
+    genes.forEach(g => {
+      if (g.end < pos) {
+        const d = pos - g.end;
+        if (!upstream || d < upstream.d) upstream = { g, d };
+      } else if (g.start > pos) {
+        const d = g.start - pos;
+        if (!downstream || d < downstream.d) downstream = { g, d };
+      }
+    });
+    if (!upstream && !downstream) {
+      el.innerHTML = '<span class="empty-note">No genes found within 1 Mb in either direction \u2014 this is a gene-sparse region.</span>';
+      return;
+    }
+    el.innerHTML = '';
+    const tasks = [];
+    if (upstream) tasks.push(renderMiniGene(upstream.g.gene_id || upstream.g.id, '\u2190 ' + upstream.d.toLocaleString() + ' bp upstream', el));
+    if (downstream) tasks.push(renderMiniGene(downstream.g.gene_id || downstream.g.id, downstream.d.toLocaleString() + ' bp downstream \u2192', el));
+    await Promise.all(tasks);
+    if (!el.children.length) el.innerHTML = '<span class="empty-note">Couldn\u2019t load nearby gene details right now.</span>';
+  } catch (e) {
+    el.innerHTML = '<span class="empty-note">Couldn\u2019t check nearby genes right now.</span>';
+  }
+}
+
+function showIntergenicInfo(chrom, pos) {
+  const box = document.getElementById('intergenic-box');
+  box.style.display = 'block';
+  loadRegulatoryAt(chrom, pos);
+  loadNearestGeneDetails(chrom, pos);
+}
+
+
 async function lookupByPosition(chrom, pos) {
   hideCard();
+  document.getElementById('intergenic-box').style.display = 'none';
   showIdeogram(chrom, pos);
   setStatus('Searching chr' + chrom + ':' + pos.toLocaleString() + '…');
   const goBtn = document.getElementById('go-position');
@@ -1028,7 +1294,8 @@ async function lookupByPosition(chrom, pos) {
     const region = chrom + ':' + Math.max(1, pos - 1) + '-' + (pos + 1);
     const genes = await ensemblGet('/overlap/region/human/' + region + '?feature=gene&content-type=application/json');
     if (!genes.length) {
-      setStatus('No gene at that position — it may be in an intergenic region.', true);
+      setStatus('No gene at that position — it\u2019s in an intergenic region.', true);
+      showIntergenicInfo(chrom, pos);
       return;
     }
     const primary = genes.find(g => g.biotype === 'protein_coding') || genes[0];
@@ -1043,6 +1310,7 @@ async function lookupByPosition(chrom, pos) {
 
 async function lookupBySymbol(symbol) {
   hideCard();
+  document.getElementById('intergenic-box').style.display = 'none';
   ideogramBox.style.display = 'none';
   setStatus('Searching for ' + symbol + '…');
   const goBtn = document.getElementById('go-symbol');
