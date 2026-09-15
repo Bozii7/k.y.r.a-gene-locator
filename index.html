@@ -617,6 +617,7 @@
   <div class="lookup-modes">
     <button class="mode-btn active" data-mode="position">By position</button>
     <button class="mode-btn" data-mode="symbol">By gene name</button>
+    <button class="mode-btn" data-mode="rsid">By rsID</button>
   </div>
 
   <div id="position-form">
@@ -634,6 +635,14 @@
       <button class="go" id="go-symbol">Look up</button>
     </div>
     <div class="hint">searches by official gene symbol</div>
+  </div>
+
+  <div id="rsid-form" style="display:none;">
+    <div class="form-row">
+      <input type="text" id="rsid-input" placeholder="e.g. rs6025" autocomplete="off">
+      <button class="go" id="go-rsid">Look up</button>
+    </div>
+    <div class="hint">searches by rsID (dbSNP) — sidesteps build mismatches, same ID either way</div>
   </div>
 
   <div class="ideogram-box" id="ideogram-box">
@@ -754,6 +763,7 @@ document.querySelectorAll('.build-btn').forEach(btn => {
 const modeButtons = document.querySelectorAll('.mode-btn');
 const positionForm = document.getElementById('position-form');
 const symbolForm = document.getElementById('symbol-form');
+const rsidForm = document.getElementById('rsid-form');
 modeButtons.forEach(btn => {
   btn.addEventListener('click', () => {
     modeButtons.forEach(b => b.classList.remove('active'));
@@ -761,8 +771,11 @@ modeButtons.forEach(btn => {
     const mode = btn.dataset.mode;
     positionForm.style.display = mode === 'position' ? 'block' : 'none';
     symbolForm.style.display = mode === 'symbol' ? 'block' : 'none';
+    rsidForm.style.display = mode === 'rsid' ? 'block' : 'none';
     clearStatus();
     hideCard();
+    document.getElementById('intergenic-box').style.display = 'none';
+    if (mode !== 'position') document.getElementById('ideogram-box').style.display = 'none';
   });
 });
 
@@ -982,6 +995,15 @@ function wireVariantChecker(chrom, pos, geneId) {
     currentRefBase = ref;
     document.getElementById('ref-preview').innerHTML =
       'Reference base here is <span class="base">' + ref + '</span> — type a different letter (A, C, G, or T) to test a change.';
+    if (pendingRsidAlleles && pendingRsidAlleles.chrom === chrom && pendingRsidAlleles.pos === pos) {
+      const alt = pendingRsidAlleles.alleles.find(a => a !== ref) || pendingRsidAlleles.alleles[0];
+      if (alt) {
+        document.getElementById('variant-alt').value = alt;
+        document.getElementById('ref-preview').innerHTML =
+          'Reference base here is <span class="base">' + ref + '</span> — this rsID\u2019s alt allele (<span class="base">' + alt + '</span>) is prefilled below, just tap Predict.';
+      }
+      pendingRsidAlleles = null;
+    }
   }).catch(() => {
     document.getElementById('ref-preview').textContent = '';
   });
@@ -1283,13 +1305,11 @@ function showIntergenicInfo(chrom, pos) {
 }
 
 
-async function lookupByPosition(chrom, pos) {
+async function searchPosition(chrom, pos) {
   hideCard();
   document.getElementById('intergenic-box').style.display = 'none';
   showIdeogram(chrom, pos);
   setStatus('Searching chr' + chrom + ':' + pos.toLocaleString() + '…');
-  const goBtn = document.getElementById('go-position');
-  goBtn.disabled = true;
   try {
     const region = chrom + ':' + Math.max(1, pos - 1) + '-' + (pos + 1);
     const genes = await ensemblGet('/overlap/region/human/' + region + '?feature=gene&content-type=application/json');
@@ -1303,6 +1323,48 @@ async function lookupByPosition(chrom, pos) {
     await loadGeneById(primary.gene_id || primary.id, genes, pos);
   } catch (err) {
     setStatus(err.message, true);
+  }
+}
+
+async function lookupByPosition(chrom, pos) {
+  const goBtn = document.getElementById('go-position');
+  goBtn.disabled = true;
+  await searchPosition(chrom, pos);
+  goBtn.disabled = false;
+}
+
+let pendingRsidAlleles = null; // { chrom, pos, alleles }
+
+async function lookupByRsid(rawInput) {
+  let rsid = rawInput.trim().toLowerCase();
+  if (/^\d+$/.test(rsid)) rsid = 'rs' + rsid;
+  const goBtn = document.getElementById('go-rsid');
+  if (!/^rs\d+$/.test(rsid)) {
+    setStatus('Enter a valid rsID, like rs6025.', true);
+    return;
+  }
+  hideCard();
+  document.getElementById('intergenic-box').style.display = 'none';
+  ideogramBox.style.display = 'none';
+  setStatus('Looking up ' + rsid + '…');
+  goBtn.disabled = true;
+  try {
+    const data = await ensemblGet('/variation/human/' + rsid + '?content-type=application/json');
+    const knownChroms = new Set(Object.keys(currentChromLengths()));
+    const mappings = (data.mappings || []).filter(m => knownChroms.has(m.seq_region_name));
+    if (!mappings.length) {
+      setStatus('No mapping found for ' + rsid + ' on ' + currentBuild + ' \u2014 try switching build (top right) and searching again.', true);
+      return;
+    }
+    const m = mappings[0];
+    pendingRsidAlleles = null;
+    if (m.allele_string) {
+      const alleles = m.allele_string.split('/').filter(a => /^[ACGT]$/.test(a));
+      if (alleles.length >= 2) pendingRsidAlleles = { chrom: m.seq_region_name, pos: m.start, alleles };
+    }
+    await searchPosition(m.seq_region_name, m.start);
+  } catch (err) {
+    setStatus("Couldn't find that rsID on " + currentBuild + ".", true);
   } finally {
     goBtn.disabled = false;
   }
@@ -1346,11 +1408,20 @@ document.getElementById('go-symbol').addEventListener('click', () => {
   lookupBySymbol(symbol);
 });
 
+document.getElementById('go-rsid').addEventListener('click', () => {
+  const val = document.getElementById('rsid-input').value.trim();
+  if (!val) { setStatus('Enter an rsID, like rs6025.', true); return; }
+  lookupByRsid(val);
+});
+
 document.getElementById('position').addEventListener('keydown', e => {
   if (e.key === 'Enter') document.getElementById('go-position').click();
 });
 document.getElementById('symbol').addEventListener('keydown', e => {
   if (e.key === 'Enter') document.getElementById('go-symbol').click();
+});
+document.getElementById('rsid-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('go-rsid').click();
 });
 </script>
 </body>
